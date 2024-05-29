@@ -97,6 +97,8 @@ contract ExchangeTest is Test {
         address(exchange).call{value: 10 * 1e18}(
             abi.encodeWithSignature("swapEthToToken(uint256)", 100 * 1e18)
         );
+
+        address(exchange).swapEthToToken(){value: 10 * 1e18}(100 * 1e18);
     }
 }
 
