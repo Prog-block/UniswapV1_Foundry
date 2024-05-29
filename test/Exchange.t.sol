@@ -98,8 +98,6 @@ contract ExchangeTest is Test {
             abi.encodeWithSignature("swapEthToToken(uint256)", 100 * 1e18)
         );
     }
-
-    
 }
 
 // forge test --match-path test/Exchange.t.sol -vvv
