@@ -3,19 +3,19 @@ pragma solidity ^0.8.13;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "./interfaces/IExchange.sol";
-import "./interfaces/IFactory.sol";
+import {IExchange} from "./interfaces/IExchange.sol";
+import {IFactory} from "./interfaces/IFactory.sol";
 
 contract Exchange is ERC20 {
     address public tokenAddress;
     address public factoryAddress;
 
-    error invalidExchangeAddress();
+    error InvalidExchangeAddress();
     error InvalidTokenAddress();
-    error noTokenProvided();
-    error noEtherProvided();
-    error insufficientTokenAmount();
-    error insufficientEtherAmount();
+    error NoTokenProvided();
+    error NoEtherProvided();
+    error InsufficientTokenAmount();
+    error InsufficientEtherAmount();
     error TransferFailed();
 
     constructor(address token) ERC20("UNISWAP-V1", "UNI-V1") {
@@ -37,7 +37,7 @@ contract Exchange is ERC20 {
             uint256 tokenAmount = (msg.value * getTokenReserve()) /
                 (ethReserve);
 
-            if (tokenAmount < _tokenAmount) revert insufficientTokenAmount();
+            if (tokenAmount < _tokenAmount) revert InsufficientTokenAmount();
 
             _safeTransferToken(msg.sender, address(this), tokenAmount);
             liquidity = (msg.value * totalSupply()) / ethReserve;
@@ -48,7 +48,7 @@ contract Exchange is ERC20 {
     function removeLiquidity(
         uint256 _amount
     ) public payable returns (uint256 ethAmount, uint256 tokenAmount) {
-        if (_amount == 0) revert noTokenProvided();
+        if (_amount == 0) revert NoTokenProvided();
 
         ethAmount = (getEthReserve() * _amount) / totalSupply();
         tokenAmount = (getTokenReserve() * _amount) / totalSupply();
@@ -61,40 +61,40 @@ contract Exchange is ERC20 {
         uint256 _amount,
         uint256 _minEth
     ) public returns (uint256 ethAmount) {
-        if (_amount == 0) revert noTokenProvided();
+        if (_amount == 0) revert NoTokenProvided();
         _safeTransferToken(msg.sender, address(this), _amount);
-        ethAmount = getAmount(_amount, getTokenReserve(), getEthReserve());
+        ethAmount = _getAmount(_amount, getTokenReserve(), getEthReserve());
 
-        if (ethAmount < _minEth) revert insufficientEtherAmount();
+        if (ethAmount < _minEth) revert InsufficientEtherAmount();
         _safeTransferEth(msg.sender, ethAmount);
     }
 
-    function ethToTokenTransfer(
+    function _ethToTokenTransfer(
         uint256 _minTokens,
         address _recipient
-    ) public payable {
-        if (msg.value == 0) revert noEtherProvided();
-        ethToToken(_minTokens, _recipient);
+    ) public payable returns (uint256 tokenAmount) {
+        if (msg.value == 0) revert NoEtherProvided();
+        tokenAmount = _ethToToken(_minTokens, _recipient);
     }
 
     function swapEthToToken(
         uint256 _minAmount
     ) public payable returns (uint256 tokenAmount) {
-        if (msg.value == 0) revert noEtherProvided();
+        if (msg.value == 0) revert NoEtherProvided();
 
-        ethToToken(_minAmount, msg.sender);
+        tokenAmount = _ethToToken(_minAmount, msg.sender);
     }
 
-    function ethToToken(
+    function _ethToToken(
         uint256 _minAmount,
         address recipient
     ) private returns (uint256 tokenAmount) {
-        tokenAmount = getAmount(
+        tokenAmount = _getAmount(
             msg.value,
             getEthReserve() - msg.value,
             getTokenReserve()
         );
-        if (tokenAmount < _minAmount) revert insufficientTokenAmount();
+        if (tokenAmount < _minAmount) revert InsufficientTokenAmount();
         IERC20(tokenAddress).transfer(recipient, tokenAmount);
     }
 
@@ -102,17 +102,17 @@ contract Exchange is ERC20 {
         uint256 _tokenInAmount,
         uint256 _minTokenOutAmount,
         address _tokenAddress
-    ) public payable returns (uint256 tokenAmount) {
-        if (_tokenInAmount == 0) revert noTokenProvided();
-        if (_tokenAddress == 0) revert InvalidTokenAddress();
+    ) public payable {
+        if (_tokenInAmount == 0) revert NoTokenProvided();
+        if (_tokenAddress == address(0)) revert InvalidTokenAddress();
 
         address exchangeAddress = IFactory(factoryAddress).getExchange(
             _tokenAddress
         );
         if (exchangeAddress == address(this) || exchangeAddress == address(0))
-            revert invalidExchangeAddress();
+            revert InvalidExchangeAddress();
 
-        uint256 ethBought = getAmount(
+        uint256 ethBought = _getAmount(
             _tokenInAmount,
             getTokenReserve(),
             getEthReserve()
@@ -127,15 +127,22 @@ contract Exchange is ERC20 {
 
     // 0.3% fees
     // ^x*y/(x+^x) = ^y = amount of tokens
-    function getAmount(
+    function _getAmount(
         uint256 amountIn,
         uint256 amountInReserve,
         uint256 amountOutReserve
     ) private pure returns (uint256 amount) {
-        uint256 inputAmountWithFee = amountIn * 997;
-        amount =
-            (inputAmountWithFee * amountOutReserve) /
-            (inputAmountWithFee + amountInReserve * 1000);
+        assembly {
+            let inputAmountWithFee := mul(amountIn, 997) // 1000 gas savings at each execution
+            amount := div(
+                mul(inputAmountWithFee, amountOutReserve),
+                add(inputAmountWithFee, mul(amountInReserve, 1000))
+            )
+        }
+        //     uint256 inputAmountWithFee = amountIn * 997;
+        //     amount =
+        //         (inputAmountWithFee * amountOutReserve) /
+        //         (inputAmountWithFee + amountInReserve * 1000);
     }
 
     function getEthReserve() public view returns (uint256 ethAmount) {
@@ -147,7 +154,7 @@ contract Exchange is ERC20 {
     }
 
     function _safeTransferEth(address to, uint256 value) private {
-        (bool sent, bytes memory data) = payable(to).call{value: value}("");
+        (bool success, bytes memory data) = payable(to).call{value: value}("");
 
         if (!success || (data.length != 0 && !abi.decode(data, (bool))))
             revert TransferFailed();
@@ -158,12 +165,12 @@ contract Exchange is ERC20 {
         address to,
         uint256 amount
     ) private {
-        (bool success, bytes memory data) = token.call(
+        (bool success, bytes memory data) = tokenAddress.call(
             abi.encodeWithSignature(
                 "transferFrom(address,address,uint256)",
                 from,
                 to,
-                value
+                amount
             )
         );
         if (!success || (data.length != 0 && !abi.decode(data, (bool))))
