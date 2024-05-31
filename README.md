@@ -1,66 +1,30 @@
-## Foundry
+# UniswapV1🦄
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+Uniswap is a decentralized exchange (DEX). And thus aims to be an alternative to centralised exchanges. It is based on various smart contracts, which enable the exchange of tokens. Currently there are 3 versions of Uniswap. This repo deals with the first version i.e UniswapV1.
 
-Foundry consists of:
+UniswapV1 introduced the concept of Automated Market Making (AMM) used Constant Product Market Maker Formula.
 
--   **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
--   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
--   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
--   **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+### Architecture Overview:
 
-## Documentation
+Exchange Contract: This is the main contract that facilitates token swaps. Users can exchange one ERC-20 token for another directly through this contract.
 
-https://book.getfoundry.sh/
+Factory Contract: This contract is responsible for deploying new Exchange Contracts for each token pair. It serves as a factory for creating new liquidity pools.
+
+Token Contract: While Uniswap V1 doesn't have its own token, it interacts with ERC-20 tokens on the Ethereum blockchain. Users can swap any ERC-20 token listed on Uniswap.
 
 ## Usage
 
-### Build
+### Build 🏗️
 
 ```shell
 $ forge build
 ```
 
-### Test
+### Test ✅
 
 ```shell
-$ forge test
+$ forge test --match-path test/Exchange.t.sol -vv
 ```
 
-### Format
+### Enjoy building✌️
 
-```shell
-$ forge fmt
-```
-
-### Gas Snapshots
-
-```shell
-$ forge snapshot
-```
-
-### Anvil
-
-```shell
-$ anvil
-```
-
-### Deploy
-
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
-
-### Cast
-
-```shell
-$ cast <subcommand>
-```
-
-### Help
-
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
-```
